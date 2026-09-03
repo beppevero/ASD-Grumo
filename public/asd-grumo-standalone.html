@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ASD Grumo Volley - Gestione Atleti & Certificati</title>
+  <meta name="description" content="PWA per la gestione e comunicazione atleti, certificati medici agonisti e convocazioni della ASD Grumo Volley.">
+  <meta name="theme-color" content="#0B4FBA">
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            grumoBlue: {
+              DEFAULT: '#0B4FBA',
+              dark: '#07388A',
+              light: '#2563EB',
+              subtle: '#EEF4FF'
+            },
+            grumoRed: {
+              DEFAULT: '#C8102E',
+              dark: '#A00A23',
+              subtle: '#FEF2F2'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .badge-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .6; } }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen pb-12 antialiased">
+
+  <!-- TOP HEADER -->
+  <header class="bg-[#0B4FBA] text-white shadow-md sticky top-0 z-40">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3 cursor-pointer" onclick="goToHome()">
+        <!-- ASD Grumo Official SVG Logo -->
+        <svg viewBox="0 0 500 500" class="w-10 h-10 rounded-full bg-white shadow" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="250" cy="250" r="236" fill="#FFFFFF" stroke="#0B4FBA" stroke-width="20"/>
+          <!-- Left side: Blue Ram / Goat Head -->
+          <path d="M 230 40 C 180 40, 100 80, 80 150 C 70 185, 75 225, 90 260 C 105 295, 130 330, 160 365 C 175 385, 185 410, 190 435 C 195 450, 205 460, 215 455 C 225 450, 220 430, 215 410 C 225 435, 235 445, 245 440 C 255 435, 245 405, 240 380 C 255 350, 255 300, 250 250 L 245 220 C 240 180, 235 120, 230 40 Z" fill="#0B4FBA"/>
+          <!-- White fleece & horn contours -->
+          <path d="M 120 180 C 105 160, 100 130, 115 110 C 130 90, 160 85, 185 95 C 170 75, 190 55, 215 60 C 235 65, 245 85, 240 110 C 230 140, 210 160, 185 170 C 160 175, 140 170, 120 180 Z" fill="#FFFFFF"/>
+          <ellipse cx="165" cy="265" rx="14" ry="7" transform="rotate(-20 165 265)" fill="#FFFFFF"/>
+          <path d="M 215 285 C 228 290, 235 295, 225 310 C 215 315, 205 310, 200 305 Z" fill="#FFFFFF"/>
+          <path d="M 160 365 C 150 395, 140 425, 150 445 C 155 455, 165 450, 165 435 C 165 415, 175 390, 185 375 Z" fill="#0B4FBA"/>
+          <!-- Right side: Red Volleyball panels #C8102E -->
+          <path d="M 270 60 C 310 65, 360 85, 395 125 C 420 155, 435 190, 440 230 C 410 215, 360 205, 315 200 C 275 195, 260 180, 255 140 C 250 100, 255 70, 270 60 Z" fill="#C8102E"/>
+          <path d="M 265 225 C 300 230, 335 240, 350 265 C 365 290, 360 330, 345 365 C 335 390, 315 415, 285 435 C 280 395, 285 350, 290 310 C 295 270, 285 240, 265 225 Z" fill="#C8102E"/>
+          <path d="M 375 225 C 410 250, 430 285, 435 330 C 440 370, 420 405, 390 430 C 375 395, 375 350, 385 305 C 390 280, 385 250, 375 225 Z" fill="#C8102E"/>
+        </svg>
+        <div>
+          <div class="font-extrabold text-lg tracking-wide uppercase leading-tight">ASD GRUMO</div>
+          <div class="text-[10px] text-blue-200 tracking-wider font-semibold">PALLAVOLO • COMUNICAZIONI SOCIETARIE</div>
+        </div>
+      </div>
+
+      <div id="headerActions" class="flex items-center gap-2">
+        <!-- Switch mode button when logged in -->
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER -->
+  <main id="app" class="max-w-5xl mx-auto px-4 pt-6">
+    <!-- Dynamic views injected here: Home, AthleteView, StaffView -->
+  </main>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <div id="toastContent" class="bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2"></div>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    // Initial Dataset for ASD Grumo (nessun atleta finto/demo)
+    const DEFAULT_DATA = [];
+
+    // State
+    let athletes = [];
+    let currentRole = null; // 'ATHLETE' | 'STAFF' | null
+    let selectedAthleteId = null;
+
+    function initData() {
+      const stored = localStorage.getItem('asd_grumo_db');
+      if (!stored) {
+        athletes = DEFAULT_DATA;
+        saveData();
+      } else {
+        try {
+          athletes = JSON.parse(stored);
+        } catch(e) {
+          athletes = DEFAULT_DATA;
+          saveData();
+        }
+      }
+    }
+
+    function saveData() {
+      localStorage.setItem('asd_grumo_db', JSON.stringify(athletes));
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const content = document.getElementById('toastContent');
+      content.innerHTML = msg;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+
+    // Helper: calculate cert status relative to reference date 2026-09-03
+    function getCertStatus(dateStr) {
+      const now = new Date('2026-09-03T00:00:00');
+      const cert = new Date(dateStr + 'T00:00:00');
+      const diffDays = Math.ceil((cert - now) / (1000 * 60 * 60 * 24));
+
+      if (diffDays < 0) {
+        return {
+          type: 'EXPIRED',
+          days: Math.abs(diffDays),
+          label: 'SCADUTO (BLOCCATO)',
+          color: 'text-red-700 bg-red-100 border-red-300',
+          badge: 'bg-red-600 text-white',
+          desc: 'Scaduto da ' + Math.abs(diffDays) + ' giorni. Attività sospesa.'
+        };
+      } else if (diffDays <= 30) {
+        return {
+          type: 'EXPIRING',
+          days: diffDays,
+          label: 'IN SCADENZA',
+          color: 'text-amber-800 bg-amber-100 border-amber-300',
+          badge: 'bg-amber-500 text-white',
+          desc: 'Scade tra ' + diffDays + ' giorni. Rinnovo richiesto!'
+        };
+      } else {
+        return {
+          type: 'VALID',
+          days: diffDays,
+          label: 'REGOLARE',
+          color: 'text-emerald-700 bg-emerald-100 border-emerald-300',
+          badge: 'bg-emerald-600 text-white',
+          desc: 'Valido per ancora ' + diffDays + ' giorni.'
+        };
+      }
+    }
+
+    function renderHeader() {
+      const container = document.getElementById('headerActions');
+      if (currentRole) {
+        container.innerHTML = `
+          <button onclick="goToHome()" class="text-xs bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg font-medium transition cursor-pointer flex items-center gap-1">
+            Esci / Cambia
+          </button>
+        `;
+      } else {
+        container.innerHTML = ``;
+      }
+    }
+
+    function goToHome() {
+      currentRole = null;
+      selectedAthleteId = null;
+      renderHeader();
+      renderHome();
+    }
+
+    function selectAthlete(id) {
+      selectedAthleteId = id;
+      currentRole = 'ATHLETE';
+      renderHeader();
+      renderAthleteView();
+    }
+
+    function openStaffPanel() {
+      currentRole = 'STAFF';
+      renderHeader();
+      renderStaffView();
+    }
+
+    // --- VIEW 1: HOME (PORTALE ACCESSO) ---
+    function renderHome() {
+      const app = document.getElementById('app');
+      app.innerHTML = `
+        <div class="max-w-xl mx-auto space-y-6">
+          <div class="text-center pt-2 pb-4">
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-[#0B4FBA] tracking-tight">Portale Comunicazioni ASD Grumo</h1>
+            <p class="text-xs sm:text-sm text-slate-600 mt-1 max-w-md mx-auto">
+              Accesso rapido e mirato senza password per atleti, famiglie e staff tecnico.
+            </p>
+          </div>
+
+          <!-- SELEZIONE ACCESSO -->
+          <div class="grid sm:grid-cols-2 gap-4">
+            <!-- SCHEDA ATLETA -->
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 hover:border-blue-500 transition-all flex flex-col justify-between">
+              <div>
+                <div class="w-12 h-12 rounded-xl bg-blue-50 text-[#0B4FBA] flex items-center justify-center font-bold text-xl mb-3">
+                  🏐
+                </div>
+                <h2 class="text-lg font-bold text-slate-900">Accesso Atleta / Genitore</h2>
+                <p class="text-xs text-slate-500 mt-1">
+                  Consulta lo stato del certificato medico, avvisi personali e convocazioni.
+                </p>
+              </div>
+
+              <div class="mt-5 space-y-2">
+                <label class="block text-xs font-semibold text-slate-700">Seleziona Atleta:</label>
+                <select id="homeAthleteSelect" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 font-medium focus:ring-2 focus:ring-[#0B4FBA] focus:outline-none">
+                  <option value="">-- Scegli il tuo nome --</option>
+                  ${athletes.map(a => `<option value="${a.id}">${a.cognome} ${a.nome} (${a.squadra})</option>`).join('')}
+                </select>
+
+                <div class="pt-2 text-center text-[11px] text-slate-400 font-medium">oppure cerca per Codice Fiscale:</div>
+                <div class="flex gap-2">
+                  <input type="text" id="homeCfInput" placeholder="Es. RSSMRC..." class="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs uppercase focus:ring-2 focus:ring-[#0B4FBA] focus:outline-none">
+                  <button onclick="searchByCf()" class="bg-[#0B4FBA] hover:bg-blue-800 text-white text-xs font-semibold px-3 py-2 rounded-xl transition">
+                    Cerca
+                  </button>
+                </div>
+
+                <button onclick="accessSelectedAthlete()" class="w-full mt-3 bg-[#0B4FBA] hover:bg-[#07388A] text-white py-2.5 rounded-xl font-bold text-xs shadow-md transition">
+                  Apri la Mia Scheda →
+                </button>
+              </div>
+            </div>
+
+            <!-- PANNELLO DIRIGENZA -->
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 hover:border-red-500 transition-all flex flex-col justify-between">
+              <div>
+                <div class="w-12 h-12 rounded-xl bg-red-50 text-[#C8102E] flex items-center justify-center font-bold text-xl mb-3">
+                  📋
+                </div>
+                <h2 class="text-lg font-bold text-slate-900">Pannello Dirigenza / Staff</h2>
+                <p class="text-xs text-slate-500 mt-1">
+                  Dashboard certificati, gestione anagrafica, invio solleciti e WhatsApp automatici.
+                </p>
+              </div>
+
+              <div class="mt-5 space-y-3">
+                <div class="bg-slate-50 rounded-xl p-3 border border-slate-100 text-xs text-slate-600">
+                  Accesso riservato a dirigenti, segreteria e coach ASD Grumo.
+                </div>
+
+                <button onclick="openStaffPanel()" class="w-full bg-[#C8102E] hover:bg-[#A00A23] text-white py-2.5 rounded-xl font-bold text-xs shadow-md transition flex items-center justify-center gap-2">
+                  <span>Accedi al Pannello Staff</span>
+                  <span>→</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- LISTA RAPIDA ATLETI TEST -->
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 mt-6">
+            <h3 class="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Accesso Rapido Test (Clicca su un atleta):</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              ${athletes.map(a => {
+                const st = getCertStatus(a.scadenzaCertificato);
+                return `
+                  <div onclick="selectAthlete('${a.id}')" class="p-2.5 rounded-xl border border-slate-100 hover:border-blue-400 hover:bg-blue-50/40 cursor-pointer transition flex items-center justify-between">
+                    <div>
+                      <div class="font-bold text-xs text-slate-900">${a.cognome} ${a.nome}</div>
+                      <div class="text-[10px] text-slate-500">${a.squadra}</div>
+                    </div>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${st.badge}">${st.label}</span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function accessSelectedAthlete() {
+      const sel = document.getElementById('homeAthleteSelect');
+      if (sel && sel.value) {
+        selectAthlete(sel.value);
+      } else {
+        alert('Seleziona prima un atleta o inserisci il Codice Fiscale.');
+      }
+    }
+
+    function searchByCf() {
+      const input = document.getElementById('homeCfInput');
+      const val = input.value.trim().toUpperCase();
+      if (!val) return;
+      const found = athletes.find(a => a.codiceFiscale.toUpperCase().includes(val) || (a.cognome + ' ' + a.nome).toUpperCase().includes(val));
+      if (found) {
+        selectAthlete(found.id);
+      } else {
+        alert('Nessun atleta trovato con questo Codice Fiscale.');
+      }
+    }
+
+    // --- VIEW 2: SCHEDA PERSONALE ATLETA ---
+    function renderAthleteView() {
+      const athlete = athletes.find(a => a.id === selectedAthleteId);
+      if (!athlete) return goToHome();
+
+      const cert = getCertStatus(athlete.scadenzaCertificato);
+      const app = document.getElementById('app');
+
+      app.innerHTML = `
+        <div class="max-w-2xl mx-auto space-y-5">
+          <!-- ATLETA HEADER CARD -->
+          <div class="bg-gradient-to-r from-[#0B4FBA] to-[#07388A] rounded-2xl p-5 text-white shadow-lg relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <div>
+                <span class="text-[10px] tracking-wider font-bold bg-white/20 px-2.5 py-0.5 rounded-full uppercase">
+                  ${athlete.squadra}
+                </span>
+                <h1 class="text-2xl font-black mt-2 tracking-tight">${athlete.nome} ${athlete.cognome}</h1>
+                <div class="text-xs text-blue-100 mt-0.5">
+                  CF: <span class="font-mono font-medium">${athlete.codiceFiscale}</span> • Maglia #${athlete.numeroMaglia || '-'}
+                </div>
+              </div>
+              <div class="w-14 h-14 rounded-full bg-white/10 border-2 border-white/30 flex items-center justify-center text-xl font-black">
+                #${athlete.numeroMaglia || '🏐'}
+              </div>
+            </div>
+          </div>
+
+          <!-- SEZIONE 1: CERTIFICATO MEDICO AGONISTICO -->
+          <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <span>🩺</span> Stato Certificato Medico
+              </h2>
+              <span class="text-xs font-bold px-3 py-1 rounded-full ${cert.badge} ${cert.type === 'EXPIRED' ? 'badge-pulse' : ''}">
+                ${cert.label}
+              </span>
+            </div>
+
+            <!-- Visual Alert Box -->
+            <div class="p-4 rounded-xl border ${cert.color} mb-4">
+              <div class="font-bold text-sm mb-1">${cert.desc}</div>
+              <div class="text-xs opacity-90">
+                Data di scadenza registrata: <strong class="underline">${athlete.scadenzaCertificato.split('-').reverse().join('/')}</strong>
+              </div>
+            </div>
+
+            <!-- Istruzioni per il Rinnovo -->
+            <div class="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-2.5 text-xs text-slate-700">
+              <div class="font-bold text-slate-900 text-sm">Come rinnovare e consegnare il certificato:</div>
+              <ul class="list-disc list-inside space-y-1 text-slate-600">
+                <li>Prenota la visita medico-sportiva agonistica presso un centro autorizzato (es. Centro convenzionato Grumo / Bari).</li>
+                <li>Ritira il certificato originale timbrato con dicitura <strong>"Pallavolo B1"</strong>.</li>
+                <li>Invia una foto chiara o PDF del certificato direttamente alla segreteria ASD Grumo:</li>
+              </ul>
+
+              <div class="flex flex-wrap gap-2 pt-2">
+                <a href="https://wa.me/393330001122?text=${encodeURIComponent('Buongiorno ASD Grumo, allego il certificato medico rinnovato per ' + athlete.nome + ' ' + athlete.cognome)}" target="_blank" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-sm transition">
+                  <span>💬</span> Invia Foto su WhatsApp
+                </a>
+                <button onclick="simulateUploadCert('${athlete.id}')" class="bg-slate-800 hover:bg-slate-900 text-white font-semibold px-3 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm">
+                  <span>📤</span> Carica File Qui
+                </button>
+              </div>
+              <div id="uploadFeedback" class="text-[11px] text-emerald-700 font-semibold pt-1 hidden">
+                ✓ Ricevuta copia del certificato! Sarà verificata dalla segreteria nelle prossime ore.
+              </div>
+            </div>
+          </div>
+
+          <!-- SEZIONE 2: MESSAGGI E AVVISI PERSONALI -->
+          <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <span>📬</span> Comunicazioni & Avvisi Personali
+              </h2>
+              <span class="text-xs text-slate-400 font-semibold">${athlete.messaggi ? athlete.messaggi.length : 0} messaggi</span>
+            </div>
+
+            ${(!athlete.messaggi || athlete.messaggi.length === 0) ? `
+              <div class="text-center py-6 text-slate-400 text-xs">
+                Nessuna nuova comunicazione da parte della società.
+              </div>
+            ` : `
+              <div class="space-y-3">
+                ${athlete.messaggi.map(m => `
+                  <div class="p-3.5 rounded-xl border ${m.urgente ? 'border-red-200 bg-red-50/50' : 'border-slate-200 bg-slate-50/60'} relative">
+                    <div class="flex items-center justify-between mb-1">
+                      <span class="font-bold text-xs ${m.urgente ? 'text-red-700' : 'text-slate-900'}">${m.titolo}</span>
+                      <span class="text-[10px] text-slate-400">${m.data}</span>
+                    </div>
+                    <p class="text-xs text-slate-600 leading-relaxed">${m.testo}</p>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+
+          <!-- SEZIONE 3: CONVOCAZIONI E PROSSIMA PARTITA -->
+          <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <span>🏐</span> Prossima Convocazione Evento
+              </h2>
+            </div>
+
+            ${!athlete.convocazione ? `
+              <div class="text-center py-6 text-slate-400 text-xs">Nessuna convocazione attiva per il weekend.</div>
+            ` : `
+              <div class="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3">
+                <div class="font-extrabold text-sm text-slate-900">${athlete.convocazione.titolo}</div>
+                <div class="grid grid-cols-2 gap-2 text-xs text-slate-600">
+                  <div>📅 <strong>Data:</strong> ${athlete.convocazione.data}</div>
+                  <div>⏰ <strong>Ritrovo:</strong> ${athlete.convocazione.ritrovo}</div>
+                  <div class="col-span-2">📍 <strong>Luogo:</strong> ${athlete.convocazione.luogo}</div>
+                </div>
+
+                <!-- RISPOSTA CONVOCAZIONE -->
+                <div class="pt-3 border-t border-slate-200">
+                  <div class="text-xs font-bold text-slate-700 mb-2">Conferma la tua presenza:</div>
+                  <div class="flex gap-2">
+                    <button onclick="respondConvocazione('${athlete.id}', 'CONFERMATO')" class="flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 ${athlete.convocazione.risposta === 'CONFERMATO' ? 'bg-emerald-600 text-white shadow' : 'bg-white border border-emerald-500 text-emerald-700 hover:bg-emerald-50'}">
+                      ✓ Presente
+                    </button>
+                    <button onclick="respondConvocazione('${athlete.id}', 'ASSENTE')" class="flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 ${athlete.convocazione.risposta === 'ASSENTE' ? 'bg-red-600 text-white shadow' : 'bg-white border border-red-500 text-red-700 hover:bg-red-50'}">
+                      ✗ Assente
+                    </button>
+                  </div>
+                  ${athlete.convocazione.risposta ? `
+                    <div class="mt-2 text-[11px] text-center font-medium ${athlete.convocazione.risposta === 'CONFERMATO' ? 'text-emerald-700' : 'text-red-600'}">
+                      Stato attuale: <strong>${athlete.convocazione.risposta}</strong>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            `}
+          </div>
+
+          <!-- SEZIONE 4: STATO QUOTA ASSOCIATIVA -->
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
+            <div>
+              <span class="font-bold text-slate-900">Quota Tesseramento:</span> ${athlete.quotaStatus || 'Regolare'}
+              <div class="text-[10px] text-slate-400">IBAN ASD Grumo: IT89A0000000000000000000000</div>
+            </div>
+            <button onclick="goToHome()" class="text-blue-600 hover:underline font-semibold">
+              ← Torna al Menu
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function simulateUploadCert(id) {
+      const fb = document.getElementById('uploadFeedback');
+      if (fb) fb.classList.remove('hidden');
+      const athlete = athletes.find(a => a.id === id);
+      if (athlete) {
+        athlete.certificatoCaricato = true;
+        saveData();
+      }
+      showToast('Certificato inviato alla segreteria!');
+    }
+
+    function respondConvocazione(id, risposta) {
+      const athlete = athletes.find(a => a.id === id);
+      if (athlete && athlete.convocazione) {
+        athlete.convocazione.risposta = risposta;
+        saveData();
+        renderAthleteView();
+        showToast(`Risposta registrata: ${risposta}`);
+      }
+    }
+
+    // --- VIEW 3: PANNELLO STAFF / DIRIGENZA ---
+    let staffFilter = 'ALL'; // 'ALL', 'EXPIRED', 'EXPIRING', 'VALID'
+
+    function renderStaffView() {
+      const app = document.getElementById('app');
+
+      // Calcola statistiche
+      const total = athletes.length;
+      const expiredCount = athletes.filter(a => getCertStatus(a.scadenzaCertificato).type === 'EXPIRED').length;
+      const expiringCount = athletes.filter(a => getCertStatus(a.scadenzaCertificato).type === 'EXPIRING').length;
+      const validCount = athletes.filter(a => getCertStatus(a.scadenzaCertificato).type === 'VALID').length;
+
+      // Filtra lista
+      const filtered = athletes.filter(a => {
+        if (staffFilter === 'ALL') return true;
+        return getCertStatus(a.scadenzaCertificato).type === staffFilter;
+      });
+
+      app.innerHTML = `
+        <div class="space-y-5">
+          <!-- Staff Banner -->
+          <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div class="text-xs font-bold text-red-600 tracking-wider uppercase">Pannello di Controllo Staff</div>
+              <h1 class="text-2xl font-black text-slate-900 tracking-tight">Dashboard Certificati & Comunicazioni</h1>
+              <p class="text-xs text-slate-500 mt-0.5">Monitoraggio atleti, invio avvisi WhatsApp con link precompilato e anagrafica.</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="openAddAthleteModal()" class="bg-[#0B4FBA] hover:bg-blue-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition">
+                + Nuovo Atleta
+              </button>
+              <button onclick="openBroadcastModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition">
+                📢 Avviso WhatsApp Squadra
+              </button>
+            </div>
+          </div>
+
+          <!-- Stat Cards -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div onclick="setStaffFilter('ALL')" class="bg-white p-3.5 rounded-2xl border border-slate-200 cursor-pointer hover:border-blue-500 transition ${staffFilter === 'ALL' ? 'ring-2 ring-[#0B4FBA]' : ''}">
+              <div class="text-xs text-slate-500 font-semibold">Tesserati Totali</div>
+              <div class="text-2xl font-black text-slate-900 mt-1">${total}</div>
+            </div>
+            <div onclick="setStaffFilter('EXPIRED')" class="bg-red-50 p-3.5 rounded-2xl border border-red-200 cursor-pointer hover:border-red-500 transition ${staffFilter === 'EXPIRED' ? 'ring-2 ring-red-600' : ''}">
+              <div class="text-xs text-red-700 font-bold">Scaduti / Bloccati</div>
+              <div class="text-2xl font-black text-red-700 mt-1">${expiredCount}</div>
+            </div>
+            <div onclick="setStaffFilter('EXPIRING')" class="bg-amber-50 p-3.5 rounded-2xl border border-amber-200 cursor-pointer hover:border-amber-500 transition ${staffFilter === 'EXPIRING' ? 'ring-2 ring-amber-600' : ''}">
+              <div class="text-xs text-amber-800 font-bold">In Scadenza (&le;30gg)</div>
+              <div class="text-2xl font-black text-amber-800 mt-1">${expiringCount}</div>
+            </div>
+            <div onclick="setStaffFilter('VALID')" class="bg-emerald-50 p-3.5 rounded-2xl border border-emerald-200 cursor-pointer hover:border-emerald-500 transition ${staffFilter === 'VALID' ? 'ring-2 ring-emerald-600' : ''}">
+              <div class="text-xs text-emerald-800 font-bold">Regolari (Validi)</div>
+              <div class="text-2xl font-black text-emerald-700 mt-1">${validCount}</div>
+            </div>
+          </div>
+
+          <!-- TABELLA MONITORAGGIO CERTIFICATI -->
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-sm text-slate-900">Elenco Atleti (${filtered.length})</span>
+              </div>
+              <div class="flex items-center gap-2 text-xs">
+                <span class="text-slate-400 font-medium">Filtro:</span>
+                <button onclick="setStaffFilter('ALL')" class="px-2.5 py-1 rounded-lg font-bold ${staffFilter === 'ALL' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}">Tutti</button>
+                <button onclick="setStaffFilter('EXPIRED')" class="px-2.5 py-1 rounded-lg font-bold ${staffFilter === 'EXPIRED' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-600'}">Solo Scaduti</button>
+                <button onclick="setStaffFilter('EXPIRING')" class="px-2.5 py-1 rounded-lg font-bold ${staffFilter === 'EXPIRING' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-600'}">In Scadenza</button>
+                <button onclick="setStaffFilter('VALID')" class="px-2.5 py-1 rounded-lg font-bold ${staffFilter === 'VALID' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}">Validi</button>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                  <tr>
+                    <th class="py-3 px-4">Atleta</th>
+                    <th class="py-3 px-4">Squadra</th>
+                    <th class="py-3 px-4">Scadenza Certificato</th>
+                    <th class="py-3 px-4">Stato Idoneità</th>
+                    <th class="py-3 px-4 text-right">Azioni Rapide WhatsApp</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  ${filtered.map(a => {
+                    const st = getCertStatus(a.scadenzaCertificato);
+                    const waLink = createWaLink(a);
+                    return `
+                      <tr class="hover:bg-slate-50/80 transition">
+                        <td class="py-3.5 px-4">
+                          <div class="font-bold text-slate-900">${a.cognome} ${a.nome}</div>
+                          <div class="text-[11px] text-slate-400 font-mono">${a.codiceFiscale}</div>
+                        </td>
+                        <td class="py-3.5 px-4 font-medium text-slate-700">${a.squadra}</td>
+                        <td class="py-3.5 px-4 font-mono font-medium text-slate-700">
+                          ${a.scadenzaCertificato.split('-').reverse().join('/')}
+                        </td>
+                        <td class="py-3.5 px-4">
+                          <span class="inline-flex items-center px-2.5 py-1 rounded-full font-bold text-[10px] ${st.badge}">
+                            ${st.label}
+                          </span>
+                        </td>
+                        <td class="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
+                          <!-- WhatsApp Button -->
+                          <a href="${waLink}" target="_blank" class="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg transition shadow-xs">
+                            <span>💬</span> WhatsApp
+                          </a>
+                          <!-- Update Cert Button -->
+                          <button onclick="promptUpdateCert('${a.id}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-2.5 py-1.5 rounded-lg transition">
+                            ✏️ Rinnova
+                          </button>
+                          <!-- View Athlete View -->
+                          <button onclick="selectAthlete('${a.id}')" class="bg-blue-50 hover:bg-blue-100 text-[#0B4FBA] font-semibold px-2 py-1.5 rounded-lg transition">
+                            👁️ Scheda
+                          </button>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- MODALE AGGIUNGI ATLETA -->
+        <div id="addModal" class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 hidden">
+          <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <h2 class="text-base font-bold text-slate-900">Nuova Anagrafica Atleta ASD Grumo</h2>
+            <div class="space-y-3 text-xs">
+              <div>
+                <label class="font-semibold block mb-1">Nome:</label>
+                <input id="newNome" type="text" class="w-full border rounded-xl p-2 bg-slate-50" placeholder="Es. Luca">
+              </div>
+              <div>
+                <label class="font-semibold block mb-1">Cognome:</label>
+                <input id="newCognome" type="text" class="w-full border rounded-xl p-2 bg-slate-50" placeholder="Es. Natilla">
+              </div>
+              <div>
+                <label class="font-semibold block mb-1">Codice Fiscale:</label>
+                <input id="newCf" type="text" class="w-full border rounded-xl p-2 uppercase bg-slate-50" placeholder="NTLLCU...">
+              </div>
+              <div>
+                <label class="font-semibold block mb-1">Squadra:</label>
+                <select id="newSquadra" class="w-full border rounded-xl p-2 bg-slate-50">
+                  <option>Minivolley S3</option>
+                  <option>Under 14 Femminile</option>
+                  <option>Under 16 Maschile</option>
+                  <option>Under 18</option>
+                  <option>Prima Squadra Serie D</option>
+                </select>
+              </div>
+              <div>
+                <label class="font-semibold block mb-1">Telefono WhatsApp Genitore:</label>
+                <input id="newTel" type="tel" class="w-full border rounded-xl p-2 bg-slate-50" placeholder="Es. 3331234567">
+              </div>
+              <div>
+                <label class="font-semibold block mb-1">Data Scadenza Certificato Medico:</label>
+                <input id="newScadenza" type="date" class="w-full border rounded-xl p-2 bg-slate-50" value="2027-09-01">
+              </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+              <button onclick="closeAddModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100">Annulla</button>
+              <button onclick="saveNewAthlete()" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#0B4FBA]">Salva Atleta</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function setStaffFilter(f) {
+      staffFilter = f;
+      renderStaffView();
+    }
+
+    function createWaLink(a) {
+      const st = getCertStatus(a.scadenzaCertificato);
+      let phone = a.telefonoGenitore.replace(/[^0-9]/g, '');
+      if (!phone.startsWith('39') && phone.length === 10) phone = '39' + phone;
+
+      const dateStr = a.scadenzaCertificato.split('-').reverse().join('/');
+      let msg = '';
+      if (st.type === 'EXPIRED') {
+        msg = `🏐 *ASD GRUMO - AVVISO URGENTE CERTIFICATO*\n\nGentile genitore di *${a.nome} ${a.cognome}* (${a.squadra}),\nvi informiamo che il certificato medico sportivo risulta *SCADUTO* il ${dateStr}.\n\n⚠️ L'atleta non può partecipare agli allenamenti e alle gare fino a presentazione del rinnovo.\n\nCordiali saluti,\n*ASD Grumo Volley*`;
+      } else if (st.type === 'EXPIRING') {
+        msg = `🏐 *ASD GRUMO - PROMEMORIA CERTIFICATO*\n\nGentile genitore di *${a.nome} ${a.cognome}* (${a.squadra}),\nvi ricordiamo che il certificato medico scadrà il *${dateStr}* (tra ${st.days} giorni).\n\nVi invitiamo a prenotare la visita di rinnovo per tempo.\n\n*ASD Grumo Volley*`;
+      } else {
+        msg = `🏐 *ASD GRUMO VOLLEY*\n\nCiao da ASD Grumo per *${a.nome} ${a.cognome}*! Ti ricordiamo che la prossima convocazione è disponibile nella tua app. Forza Grumo! 🔴🔵`;
+      }
+      return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    }
+
+    function promptUpdateCert(id) {
+      const athlete = athletes.find(a => a.id === id);
+      if (!athlete) return;
+      const nextDate = prompt(`Aggiorna data scadenza certificato per ${athlete.nome} ${athlete.cognome} (Formato YYYY-MM-DD):`, '2027-09-01');
+      if (nextDate && nextDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        athlete.scadenzaCertificato = nextDate;
+        saveData();
+        renderStaffView();
+        showToast(`Certificato aggiornato al ${nextDate.split('-').reverse().join('/')}!`);
+      }
+    }
+
+    function openAddAthleteModal() {
+      const m = document.getElementById('addModal');
+      if (m) m.classList.remove('hidden');
+    }
+
+    function closeAddModal() {
+      const m = document.getElementById('addModal');
+      if (m) m.classList.add('hidden');
+    }
+
+    function saveNewAthlete() {
+      const nome = document.getElementById('newNome').value.trim();
+      const cognome = document.getElementById('newCognome').value.trim();
+      const cf = document.getElementById('newCf').value.trim().toUpperCase();
+      const squadra = document.getElementById('newSquadra').value;
+      const tel = document.getElementById('newTel').value.trim();
+      const scadenza = document.getElementById('newScadenza').value;
+
+      if (!nome || !cognome || !scadenza) {
+        alert('Compila almeno Nome, Cognome e Data Scadenza Certificato.');
+        return;
+      }
+
+      athletes.unshift({
+        id: 'grumo-' + Date.now(),
+        nome,
+        cognome,
+        codiceFiscale: cf || 'ND',
+        squadra,
+        numeroMaglia: Math.floor(Math.random() * 20) + 1,
+        telefonoGenitore: tel || '3330000000',
+        nomeGenitore: cognome,
+        scadenzaCertificato: scadenza,
+        certificatoCaricato: false,
+        quotaStatus: 'Regolare',
+        messaggi: [],
+        convocazione: null
+      });
+
+      saveData();
+      closeAddModal();
+      renderStaffView();
+      showToast('Nuovo atleta aggiunto!');
+    }
+
+    function openBroadcastModal() {
+      const squadra = prompt('Seleziona squadra per avviso (es. Under 14 Femminile, Under 16 Maschile, Minivolley S3):', 'Under 14 Femminile');
+      if (!squadra) return;
+      const testo = prompt('Testo avviso da inviare:', 'Attenzione: venerdì allenamento anticipato alle ore 16:30.');
+      if (!testo) return;
+
+      athletes.forEach(a => {
+        if (a.squadra.toLowerCase().includes(squadra.toLowerCase())) {
+          if (!a.messaggi) a.messaggi = [];
+          a.messaggi.unshift({
+            id: 'm-' + Date.now(),
+            data: '03/09/2026',
+            titolo: 'Avviso Squadra: ' + squadra,
+            testo: testo,
+            urgente: false,
+            letto: false
+          });
+        }
+      });
+      saveData();
+      showToast(`Avviso inviato a tutti gli atleti della squadra ${squadra}!`);
+    }
+
+    // Initialize App on load
+    initData();
+    goToHome();
+  </script>
+</body>
+</html>

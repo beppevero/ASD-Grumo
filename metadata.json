@@ -1,0 +1,6 @@
+{
+  "name": "ASD Grumo Volley - Gestione Atleti & Certificati",
+  "description": "Applicazione PWA per ASD Grumo: monitoraggio certificati medici agonistici, comunicazioni mirate atleta per atleta, convocazioni partite e avvisi WhatsApp.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
