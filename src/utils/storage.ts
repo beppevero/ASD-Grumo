@@ -232,6 +232,79 @@ export function authenticateStaffUser(
   return found || null;
 }
 
+export function resetStaffPassword(
+  email: string,
+  newPassword: string
+): { success: boolean; error?: string; user?: StaffUser } {
+  const users = getStoredStaffUsers();
+  const normalizedEmail = email.trim().toLowerCase();
+  const targetIndex = users.findIndex((u) => u.email.trim().toLowerCase() === normalizedEmail);
+
+  if (targetIndex === -1) {
+    return {
+      success: false,
+      error: 'Nessun account staff trovato con questa email. Verifica l\'indirizzo inserito.',
+    };
+  }
+
+  if (newPassword.trim().length < 4) {
+    return {
+      success: false,
+      error: 'La nuova password deve contenere almeno 4 caratteri.',
+    };
+  }
+
+  const updatedUser: StaffUser = {
+    ...users[targetIndex],
+    password: newPassword.trim(),
+  };
+
+  const updatedList = [...users];
+  updatedList[targetIndex] = updatedUser;
+  saveStaffUsers(updatedList);
+
+  return {
+    success: true,
+    user: updatedUser,
+  };
+}
+
+export function resetAthletePassword(
+  athleteId: string,
+  newPassword: string
+): { success: boolean; error?: string; athlete?: Athlete } {
+  const athletes = getStoredAthletes();
+  const targetIndex = athletes.findIndex((a) => a.id === athleteId);
+
+  if (targetIndex === -1) {
+    return {
+      success: false,
+      error: 'Profilo atleta non trovato nel database societario.',
+    };
+  }
+
+  if (newPassword.trim().length < 4) {
+    return {
+      success: false,
+      error: 'La nuova password o PIN deve contenere almeno 4 caratteri.',
+    };
+  }
+
+  const updatedAthlete: Athlete = {
+    ...athletes[targetIndex],
+    password: newPassword.trim(),
+  };
+
+  const updatedList = [...athletes];
+  updatedList[targetIndex] = updatedAthlete;
+  saveAthletes(updatedList);
+
+  return {
+    success: true,
+    athlete: updatedAthlete,
+  };
+}
+
 /**
  * Checks athlete personal password / PIN
  */

@@ -185,9 +185,9 @@ export const AthleteView: React.FC<AthleteViewProps> = ({
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-blue-900 transition py-1 cursor-pointer"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 shadow-2xs rounded-xl px-3 py-2.5 min-h-[44px] transition cursor-pointer active:scale-95"
         >
-          <ChevronLeft className="w-4 h-4" />
+          <ChevronLeft className="w-4 h-4 text-blue-900" />
           <span>Torna alla Selezione Atleti</span>
         </button>
 
@@ -585,28 +585,28 @@ export const AthleteView: React.FC<AthleteViewProps> = ({
                 Conferma Presenza Atleta:
               </div>
 
-              <div className="flex flex-wrap gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <button
                   onClick={() => handleResponseConvocazione('CONFERMATO')}
-                  className={`flex-1 min-w-[130px] py-2.5 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95 ${
+                  className={`w-full min-h-[48px] py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-95 ${
                     athlete.prossimaConvocazione.risposta === 'CONFERMATO'
                       ? 'bg-emerald-600 text-white ring-2 ring-emerald-600 ring-offset-1'
                       : 'bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300'
                   }`}
                 >
-                  <Check className="w-4 h-4" />
+                  <Check className="w-4 h-4 shrink-0" />
                   <span>Confermo Presenza</span>
                 </button>
 
                 <button
                   onClick={() => setShowAbsenceModal(true)}
-                  className={`flex-1 min-w-[130px] py-2.5 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95 ${
+                  className={`w-full min-h-[48px] py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-95 ${
                     athlete.prossimaConvocazione.risposta === 'ASSENTE'
                       ? 'bg-red-600 text-white ring-2 ring-red-600 ring-offset-1'
                       : 'bg-white hover:bg-red-50 text-red-700 border border-red-300'
                   }`}
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-4 h-4 shrink-0" />
                   <span>Segnala Assenza</span>
                 </button>
               </div>

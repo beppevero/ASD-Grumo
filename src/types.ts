@@ -124,5 +124,6 @@ export interface Notice {
   priorita?: 'ALTA' | 'NORMALE';
   autore?: string; // es. "Direttivo ASD Grumo", "Staff Tecnico"
   pin?: boolean;
+  inEvidenza?: boolean;
 }
 

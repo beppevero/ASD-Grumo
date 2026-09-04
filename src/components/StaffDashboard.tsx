@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Athlete, StaffUser, StaffRole, Match } from '../types';
+import { Athlete, StaffUser, StaffRole, Match, Notice } from '../types';
 import {
   getCertificateStatus,
   generateWhatsAppUrl,
@@ -39,6 +39,10 @@ import {
   MapPin,
   Volleyball,
   Award,
+  Bell,
+  Pin,
+  Megaphone,
+  UserCheck,
 } from 'lucide-react';
 
 interface StaffDashboardProps {
@@ -47,6 +51,10 @@ interface StaffDashboardProps {
   onAddMatch: (match: Omit<Match, 'id'>) => void;
   onUpdateMatch: (match: Match) => void;
   onDeleteMatch: (id: string) => void;
+  notices?: Notice[];
+  onAddNotice?: (notice: Omit<Notice, 'id'>) => void;
+  onUpdateNotice?: (notice: Notice) => void;
+  onDeleteNotice?: (id: string) => void;
   onUpdateAthlete: (updated: Athlete) => void;
   onDeleteAthlete: (id: string) => void;
   onOpenAddModal: () => void;
@@ -61,6 +69,10 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   onAddMatch,
   onUpdateMatch,
   onDeleteMatch,
+  notices = [],
+  onAddNotice,
+  onUpdateNotice,
+  onDeleteNotice,
   onUpdateAthlete,
   onDeleteAthlete,
   onOpenAddModal,
@@ -95,6 +107,30 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   const [editingPinAthleteId, setEditingPinAthleteId] = useState<string | null>(null);
   const [newAthletePin, setNewAthletePin] = useState<string>('');
   const [copiedPinAthleteId, setCopiedPinAthleteId] = useState<string | null>(null);
+
+  // Athletes Directory Modal State (simile a Membri Staff & Dirigenza)
+  const [showAthletesModal, setShowAthletesModal] = useState<boolean>(false);
+  const [athletesModalSearch, setAthletesModalSearch] = useState<string>('');
+  const [athletesModalTeamFilter, setAthletesModalTeamFilter] = useState<string>('ALL');
+  const [athletesModalCertFilter, setAthletesModalCertFilter] = useState<'ALL' | 'EXPIRED_EXPIRING' | 'VALID'>('ALL');
+  const [athletesModalSuccess, setAthletesModalSuccess] = useState<string>('');
+  const [athletesModalEditingPinId, setAthletesModalEditingPinId] = useState<string | null>(null);
+  const [athletesModalNewPin, setAthletesModalNewPin] = useState<string>('');
+  const [athletesModalCopiedPinId, setAthletesModalCopiedPinId] = useState<string | null>(null);
+  const [revealedAthletePins, setRevealedAthletePins] = useState<Record<string, boolean>>({});
+
+  const handleSaveAthletePinFromModal = (athlete: Athlete) => {
+    if (!athletesModalNewPin.trim()) return;
+    const updated: Athlete = {
+      ...athlete,
+      password: athletesModalNewPin.trim(),
+    };
+    onUpdateAthlete(updated);
+    setAthletesModalEditingPinId(null);
+    setAthletesModalNewPin('');
+    setAthletesModalSuccess(`PIN aggiornato con successo per ${athlete.nome} ${athlete.cognome} (Nuovo PIN: ${updated.password})`);
+    setTimeout(() => setAthletesModalSuccess(''), 4000);
+  };
 
   const handleSaveAthletePin = (athlete: Athlete) => {
     if (!newAthletePin.trim()) return;
@@ -174,6 +210,87 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
   const [editScoreValue, setEditScoreValue] = useState('');
   const [editSetScoresValue, setEditSetScoresValue] = useState('');
   const [editMatchStato, setEditMatchStato] = useState<'PROGRAMMATA' | 'IN_CORSO' | 'CONCLUSA'>('CONCLUSA');
+
+  // Notice Board Management State
+  const [showNoticesModal, setShowNoticesModal] = useState(false);
+  const [showAddNoticeForm, setShowAddNoticeForm] = useState(false);
+  const [editingNoticeId, setEditingNoticeId] = useState<string | null>(null);
+  const [newNoticeTitolo, setNewNoticeTitolo] = useState('');
+  const [newNoticeContenuto, setNewNoticeContenuto] = useState('');
+  const [newNoticeCategoria, setNewNoticeCategoria] = useState<Notice['categoria']>('COMUNICAZIONE');
+  const [newNoticePriorita, setNewNoticePriorita] = useState<'NORMALE' | 'ALTA'>('NORMALE');
+  const [newNoticeInEvidenza, setNewNoticeInEvidenza] = useState(false);
+  const [newNoticeAutore, setNewNoticeAutore] = useState('');
+  const [noticeFormError, setNoticeFormError] = useState('');
+  const [noticeFormSuccess, setNoticeFormSuccess] = useState('');
+
+  const handleOpenEditNotice = (n: Notice) => {
+    setEditingNoticeId(n.id);
+    setNewNoticeTitolo(n.titolo);
+    setNewNoticeContenuto(n.contenuto);
+    setNewNoticeCategoria(n.categoria);
+    setNewNoticePriorita(n.priorita || 'NORMALE');
+    setNewNoticeInEvidenza(!!n.inEvidenza || !!n.pin);
+    setNewNoticeAutore(n.autore || '');
+    setShowAddNoticeForm(true);
+    setNoticeFormError('');
+    setNoticeFormSuccess('');
+  };
+
+  const handleSaveNotice = (e: React.FormEvent) => {
+    e.preventDefault();
+    setNoticeFormError('');
+    setNoticeFormSuccess('');
+    if (!newNoticeTitolo.trim() || !newNoticeContenuto.trim()) {
+      setNoticeFormError('Compila sia il titolo che il testo della comunicazione.');
+      return;
+    }
+
+    const now = new Date();
+    const dataStr = now.toISOString().split('T')[0];
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const authorStr =
+      newNoticeAutore.trim() ||
+      (currentStaffUser
+        ? `${currentStaffUser.nome} ${currentStaffUser.cognome} (${currentStaffUser.ruolo})`
+        : 'Dirigenza ASD Grumo Volley');
+
+    if (editingNoticeId) {
+      const existing = notices.find((n) => n.id === editingNoticeId);
+      if (existing && onUpdateNotice) {
+        onUpdateNotice({
+          ...existing,
+          titolo: newNoticeTitolo.trim(),
+          contenuto: newNoticeContenuto.trim(),
+          categoria: newNoticeCategoria,
+          priorita: newNoticePriorita,
+          inEvidenza: newNoticeInEvidenza,
+          pin: newNoticeInEvidenza,
+          autore: authorStr,
+        });
+        setNoticeFormSuccess('Avviso aggiornato con successo!');
+      }
+      setEditingNoticeId(null);
+    } else if (onAddNotice) {
+      onAddNotice({
+        titolo: newNoticeTitolo.trim(),
+        contenuto: newNoticeContenuto.trim(),
+        categoria: newNoticeCategoria,
+        priorita: newNoticePriorita,
+        inEvidenza: newNoticeInEvidenza,
+        pin: newNoticeInEvidenza,
+        data: dataStr,
+        orario: timeStr,
+        autore: authorStr,
+      });
+      setNoticeFormSuccess('Nuovo avviso pubblicato nella bacheca!');
+    }
+
+    setNewNoticeTitolo('');
+    setNewNoticeContenuto('');
+    setNewNoticeInEvidenza(false);
+    setShowAddNoticeForm(false);
+  };
 
   const handleToggleMatchLocationType = (isHome: boolean) => {
     setNewMatchIsHome(isHome);
@@ -418,17 +535,37 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
+          <button
+            onClick={onOpenAddModal}
+            className="flex items-center justify-center gap-1.5 bg-blue-900 hover:bg-blue-800 text-white px-3 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer active:scale-95 min-h-[44px] col-span-2 sm:col-span-1"
+          >
+            <UserPlus className="w-4 h-4 shrink-0" />
+            <span>+ Nuovo Atleta</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setShowNoticesModal(true);
+              setShowAddNoticeForm(false);
+            }}
+            className="flex items-center justify-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 px-3 sm:px-3.5 py-2.5 rounded-xl text-xs font-bold transition border border-amber-200 cursor-pointer active:scale-95 min-h-[44px]"
+            title="Gestisci la Bacheca Avvisi e comunicazioni ufficiali della società"
+          >
+            <Bell className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>Bacheca ({notices.length})</span>
+          </button>
+
           <button
             onClick={() => {
               setShowMatchesModal(true);
               setShowAddMatchForm(false);
             }}
-            className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 px-3.5 py-2 rounded-xl text-xs font-bold transition border border-blue-200 cursor-pointer active:scale-95"
+            className="flex items-center justify-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 px-3 sm:px-3.5 py-2.5 rounded-xl text-xs font-bold transition border border-blue-200 cursor-pointer active:scale-95 min-h-[44px]"
             title="Gestisci prossimi match, sedi, orari e aggiorna risultati"
           >
-            <Trophy className="w-4 h-4 text-amber-500" />
-            <span>Gare & Risultati ({matches.length})</span>
+            <Trophy className="w-4 h-4 text-amber-500 shrink-0" />
+            <span>Gare ({matches.length})</span>
           </button>
 
           <button
@@ -436,26 +573,33 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
               setStaffUsers(getStoredStaffUsers());
               setShowStaffModal(true);
             }}
-            className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 px-3.5 py-2 rounded-xl text-xs font-bold transition border border-slate-300 cursor-pointer active:scale-95"
+            className="flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 sm:px-3.5 py-2.5 rounded-xl text-xs font-bold transition border border-slate-300 cursor-pointer active:scale-95 min-h-[44px]"
             title="Gestisci account email e ruoli dello staff societario"
           >
-            <ShieldCheck className="w-4 h-4 text-red-600" />
-            <span>Membri Staff ({staffUsers.length})</span>
+            <ShieldCheck className="w-4 h-4 text-red-600 shrink-0" />
+            <span>Staff ({staffUsers.length})</span>
           </button>
 
           <button
-            onClick={onOpenAddModal}
-            className="flex items-center gap-1.5 bg-blue-900 hover:bg-blue-800 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer active:scale-95"
+            onClick={() => {
+              setShowAthletesModal(true);
+              setAthletesModalSuccess('');
+              setAthletesModalSearch('');
+              setAthletesModalTeamFilter('ALL');
+              setAthletesModalCertFilter('ALL');
+            }}
+            className="flex items-center justify-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 px-3 sm:px-3.5 py-2.5 rounded-xl text-xs font-bold transition border border-indigo-200 cursor-pointer active:scale-95 shadow-2xs min-h-[44px]"
+            title="Visualizza e gestisci l'elenco di tutti gli atleti, squadre, certificati e PIN"
           >
-            <UserPlus className="w-4 h-4" />
-            <span>Nuovo Atleta / Iscrizione</span>
+            <Users className="w-4 h-4 text-indigo-700 shrink-0" />
+            <span>Membri Atleti ({athletes.length})</span>
           </button>
 
           <button
             onClick={onOpenBroadcastModal}
-            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer active:scale-95"
+            className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer active:scale-95 min-h-[44px] col-span-2 sm:col-span-1"
           >
-            <MessageCircle className="w-4 h-4" />
+            <MessageCircle className="w-4 h-4 shrink-0" />
             <span>Invia Avviso / WhatsApp</span>
           </button>
         </div>
@@ -476,7 +620,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                 matches[0].isHome ? 'bg-blue-900 text-white' : 'bg-red-600 text-white'
               }`}
             >
-              {matches[0].isHome ? 'IN CASA • BLU' : 'FUORI CASA • ROSSO'}
+              {matches[0].isHome ? 'IN CASA' : 'FUORI CASA'}
             </span>
             <div>
               <div className="text-xs font-bold flex items-center gap-2 flex-wrap">
@@ -804,20 +948,234 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
         </div>
       </div>
 
-      {/* Main Table: Certificate & Payment Status & Actions */}
+      {/* Main Table & Mobile Card View: Certificate & Payment Status & Actions */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h2 className="text-sm sm:text-base font-bold text-slate-900">
               Elenco Atleti & Pratiche ({filteredAthletes.length})
             </h2>
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-slate-400 hidden sm:inline">
               Visualizzazione integrata idoneità, iscrizione/rinnovo e contabilità
             </span>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* VISTA A SCHEDE MOBILE (ESCLUSIVA SMARTPHONE - touch friendly) */}
+        <div className="md:hidden divide-y divide-slate-100">
+          {filteredAthletes.length === 0 ? (
+            <div className="py-10 px-4 text-center text-slate-400 text-xs">
+              Nessun atleta corrispondente ai filtri selezionati.
+            </div>
+          ) : (
+            filteredAthletes.map((athlete) => {
+              const status = getCertificateStatus(athlete.scadenzaCertificato);
+              const waCertUrl = generateWhatsAppUrl(athlete, 'CERTIFICATO');
+              const waQuotaUrl = generateWhatsAppUrl(athlete, 'QUOTA');
+              const residuo = athlete.quotaTotale - athlete.quotaVersata;
+              const isEditingCert = editingCertAthleteId === athlete.id;
+
+              return (
+                <div
+                  key={`m-${athlete.id}`}
+                  className={`p-4 transition ${
+                    status.status === 'EXPIRED'
+                      ? 'bg-red-50/25'
+                      : status.status === 'EXPIRING'
+                      ? 'bg-amber-50/25'
+                      : 'bg-white'
+                  }`}
+                >
+                  {/* Riga 1: Nome, Squadra, Maglia e Tipo */}
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h3 className="font-extrabold text-slate-900 text-base">
+                          {athlete.cognome} {athlete.nome}
+                        </h3>
+                        {athlete.numeroMaglia && (
+                          <span className="font-bold text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-900 font-display">
+                            #{athlete.numeroMaglia}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                        CF: {athlete.codiceFiscale}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-900 border border-blue-200">
+                        {athlete.squadra}
+                      </span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-800 border border-purple-200">
+                        {athlete.tipoPratica === 'NUOVA_ISCRIZIONE' ? 'Nuova Iscriz.' : 'Rinnovo'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Riga 2: Stato Certificato Medico (Box evidenza) */}
+                  <div className={`p-2.5 rounded-xl border mb-2.5 ${status.badgeBg} ${status.badgeBorder}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        {status.status === 'VALID' ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        ) : status.status === 'EXPIRING' ? (
+                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-red-600 shrink-0 animate-pulse" />
+                        )}
+                        <span className={`text-xs font-black ${status.badgeText}`}>
+                          {status.label}
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-600 font-mono">
+                        Scad: {athlete.scadenzaCertificato.split('-').reverse().join('/')}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mt-1 text-[11px] text-slate-500">
+                      <span>
+                        {status.daysRemaining < 0
+                          ? `Scaduto da ${Math.abs(status.daysRemaining)} giorni`
+                          : `Mancano ${status.daysRemaining} giorni`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingCertAthleteId(athlete.id);
+                          setNewCertDate(athlete.scadenzaCertificato);
+                        }}
+                        className="text-blue-900 font-bold hover:underline cursor-pointer flex items-center gap-1"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                        <span>Aggiorna data</span>
+                      </button>
+                    </div>
+
+                    {isEditingCert && (
+                      <div className="mt-2 pt-2 border-t border-slate-200 flex items-center gap-2">
+                        <input
+                          type="date"
+                          value={newCertDate}
+                          onChange={(e) => setNewCertDate(e.target.value)}
+                          className="bg-white border border-blue-400 rounded-lg px-2 py-1 text-xs font-mono w-full"
+                        />
+                        <button
+                          onClick={() => handleSaveCertDate(athlete)}
+                          className="px-3 py-1 bg-emerald-600 text-white font-bold rounded-lg text-xs shrink-0"
+                        >
+                          Salva
+                        </button>
+                        <button
+                          onClick={() => setEditingCertAthleteId(null)}
+                          className="px-2 py-1 bg-slate-200 text-slate-700 rounded-lg text-xs shrink-0"
+                        >
+                          Annulla
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Riga 3: Quota & Pagamento */}
+                  <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200 mb-2.5 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="text-slate-500 text-[11px]">Quota: </span>
+                      <span className="font-bold text-slate-900 font-mono">
+                        €{athlete.quotaVersata || 0} / €{athlete.quotaTotale}
+                      </span>
+                      {residuo > 0 ? (
+                        <span className="ml-1.5 text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                          Residuo: €{residuo}
+                        </span>
+                      ) : (
+                        <span className="ml-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          Saldato
+                        </span>
+                      )}
+                    </div>
+
+                    {athlete.ricevutaPagamento?.caricata && !athlete.ricevutaPagamento.verificata && (
+                      <button
+                        onClick={() => handleVerifyReceipt(athlete)}
+                        className="px-2 py-1 bg-blue-900 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-2xs cursor-pointer"
+                      >
+                        <CheckCheck className="w-3 h-3 text-emerald-400" />
+                        <span>Convalida</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Riga 4: Contatto Genitore & PIN Atleta */}
+                  <div className="flex items-center justify-between gap-2 text-xs mb-3">
+                    {/* Genitore con tasto chiamata rapida */}
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className="text-slate-500 text-[11px]">Genitore:</span>
+                      <span className="font-semibold text-slate-800 truncate">{athlete.nomeGenitore}</span>
+                      {athlete.telefonoGenitore && (
+                        <a
+                          href={`tel:${athlete.telefonoGenitore}`}
+                          className="p-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 flex items-center gap-1 text-[11px] font-mono shrink-0"
+                          title="Chiama subito il genitore"
+                        >
+                          <Phone className="w-3 h-3 text-slate-500" />
+                          <span>{athlete.telefonoGenitore}</span>
+                        </a>
+                      )}
+                    </div>
+
+                    {/* PIN Atleta */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-900 border border-blue-200">
+                        PIN: {athlete.password || '1234'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(athlete.password || '1234');
+                          setCopiedPinAthleteId(athlete.id);
+                          setTimeout(() => setCopiedPinAthleteId(null), 1500);
+                        }}
+                        className="p-1 rounded text-slate-400 hover:text-slate-600 cursor-pointer"
+                        title="Copia PIN"
+                      >
+                        {copiedPinAthleteId === athlete.id ? (
+                          <Check className="w-3 h-3 text-emerald-600" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Riga 5: Azioni Principali Touch (WhatsApp & Scheda) */}
+                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
+                    <a
+                      href={status.status === 'EXPIRED' || status.status === 'EXPIRING' ? waCertUrl : waQuotaUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs active:scale-98 transition"
+                    >
+                      <MessageCircle className="w-4 h-4 shrink-0" />
+                      <span>WhatsApp Genitore</span>
+                    </a>
+
+                    <button
+                      type="button"
+                      onClick={() => onSelectAthleteForView(athlete.id)}
+                      className="h-11 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs active:scale-98 transition cursor-pointer"
+                    >
+                      <UserCheck className="w-4 h-4 shrink-0" />
+                      <span>Vedi Scheda</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* DESKTOP TABLE VIEW (Visibile da md in su) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase tracking-wider text-[10px]">
               <tr>
@@ -1452,7 +1810,384 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
         </div>
       )}
 
-      {/* MATCHES & CALENDAR MODAL */}
+      {/* MODAL ELENCO ATLETI ISCRITTI & TESSERATI (SIMILE A MEMBRI STAFF & DIRIGENZA) */}
+      {showAthletesModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 p-5 sm:p-6 my-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-50 text-indigo-900 flex items-center justify-center border border-indigo-200 shadow-2xs">
+                  <Users className="w-5 h-5 text-indigo-700" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <span>Atleti Tesserati & Registrati ({athletes.length})</span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Anagrafica completa, squadre, certificati medici, quote e credenziali PIN
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAthletesModal(false);
+                  setAthletesModalSuccess('');
+                  setAthletesModalEditingPinId(null);
+                }}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                title="Chiudi pannello atleti"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Success Banner */}
+            {athletesModalSuccess && (
+              <div className="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2 shrink-0">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span className="font-semibold">{athletesModalSuccess}</span>
+              </div>
+            )}
+
+            {/* Quick Metrics Bar */}
+            <div className="mt-3.5 grid grid-cols-2 sm:grid-cols-4 gap-2 shrink-0">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-center">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Totale Atleti</span>
+                <span className="text-base font-black text-slate-900">{athletes.length}</span>
+              </div>
+              <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-2.5 text-center">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">Visita Regolare</span>
+                <span className="text-base font-black text-emerald-700">{validCount}</span>
+              </div>
+              <div className={`rounded-xl p-2.5 text-center border ${
+                expiredCount + expiringCount > 0
+                  ? 'bg-amber-50/80 border-amber-200'
+                  : 'bg-slate-50 border-slate-200'
+              }`}>
+                <span className={`text-[10px] font-bold uppercase tracking-wider block ${
+                  expiredCount + expiringCount > 0 ? 'text-amber-800' : 'text-slate-500'
+                }`}>
+                  Visita Scad./In Scad.
+                </span>
+                <span className={`text-base font-black ${
+                  expiredCount + expiringCount > 0 ? 'text-amber-700' : 'text-slate-900'
+                }`}>
+                  {expiredCount + expiringCount}
+                </span>
+              </div>
+              <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-2.5 text-center">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-900 block">Squadre Attive</span>
+                <span className="text-base font-black text-blue-900">{teams.length}</span>
+              </div>
+            </div>
+
+            {/* Search & Filter Controls */}
+            <div className="mt-3.5 flex flex-wrap items-center gap-2 shrink-0">
+              <div className="relative flex-1 min-w-[180px]">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Cerca atleta, cognome, squadra, CF..."
+                  value={athletesModalSearch}
+                  onChange={(e) => setAthletesModalSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:border-indigo-600 outline-none"
+                />
+              </div>
+
+              <select
+                value={athletesModalTeamFilter}
+                onChange={(e) => setAthletesModalTeamFilter(e.target.value)}
+                className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-indigo-600 cursor-pointer"
+              >
+                <option value="ALL">Tutte le Squadre ({athletes.length})</option>
+                {teams.map((t) => (
+                  <option key={t} value={t}>
+                    {t} ({athletes.filter((a) => a.squadra === t).length})
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={athletesModalCertFilter}
+                onChange={(e) => setAthletesModalCertFilter(e.target.value as any)}
+                className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-indigo-600 cursor-pointer"
+              >
+                <option value="ALL">Tutti gli Stati Visita</option>
+                <option value="VALID">Solo Visita Regolare</option>
+                <option value="EXPIRED_EXPIRING">Visite Scadute o in Scadenza</option>
+              </select>
+            </div>
+
+            {/* List of Athletes */}
+            <div className="mt-3.5 space-y-2.5 overflow-y-auto pr-1 flex-1 min-h-0">
+              {athletes
+                .filter((a) => {
+                  if (athletesModalTeamFilter !== 'ALL' && a.squadra !== athletesModalTeamFilter) {
+                    return false;
+                  }
+                  const cert = getCertificateStatus(a.scadenzaCertificato);
+                  if (athletesModalCertFilter === 'VALID' && cert.status !== 'VALID') {
+                    return false;
+                  }
+                  if (athletesModalCertFilter === 'EXPIRED_EXPIRING' && cert.status === 'VALID') {
+                    return false;
+                  }
+                  if (athletesModalSearch.trim()) {
+                    const q = athletesModalSearch.trim().toLowerCase();
+                    const matchName = `${a.nome} ${a.cognome}`.toLowerCase().includes(q);
+                    const matchSurname = `${a.cognome} ${a.nome}`.toLowerCase().includes(q);
+                    const matchCf = (a.codiceFiscale || '').toLowerCase().includes(q);
+                    const matchTeam = (a.squadra || '').toLowerCase().includes(q);
+                    const matchParent = (a.nomeGenitore || '').toLowerCase().includes(q);
+                    if (!matchName && !matchSurname && !matchCf && !matchTeam && !matchParent) {
+                      return false;
+                    }
+                  }
+                  return true;
+                })
+                .map((athlete) => {
+                  const certStatus = getCertificateStatus(athlete.scadenzaCertificato);
+                  const isPinRevealed = !!revealedAthletePins[athlete.id];
+                  const currentPin = athlete.password || '1234';
+                  const isEditingPin = athletesModalEditingPinId === athlete.id;
+                  const residuoQuota = Math.max(0, (athlete.quotaTotale || 0) - (athlete.quotaVersata || 0));
+
+                  return (
+                    <div
+                      key={athlete.id}
+                      className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-indigo-300 hover:bg-slate-50/90 transition shadow-2xs space-y-2.5"
+                    >
+                      {/* Top Row: Info & Badges */}
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center font-black text-indigo-900 text-xs shadow-2xs shrink-0">
+                            {athlete.nome.charAt(0)}{athlete.cognome.charAt(0)}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-slate-900 text-sm">
+                                {athlete.cognome} {athlete.nome}
+                              </span>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-900 border border-blue-200">
+                                {athlete.squadra}
+                              </span>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200">
+                                {athlete.tipoPratica === 'NUOVA_ISCRIZIONE' ? 'Nuova Iscrizione' : 'Rinnovo'}
+                              </span>
+                            </div>
+
+                            <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                              {athlete.codiceFiscale && (
+                                <span className="font-mono text-slate-600 uppercase">CF: {athlete.codiceFiscale}</span>
+                              )}
+                              {athlete.dataNascita && (
+                                <span>• Nato il {athlete.dataNascita.split('-').reverse().join('/')}</span>
+                              )}
+                              {athlete.nomeGenitore && (
+                                <span>• Genitore: {athlete.nomeGenitore}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Status Badges: Certificato & Quota */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${certStatus.badgeBg} ${certStatus.badgeText} ${certStatus.badgeBorder}`}
+                            title={certStatus.sublabel}
+                          >
+                            <Calendar className="w-3 h-3" />
+                            <span>Visita: {certStatus.label} ({athlete.scadenzaCertificato.split('-').reverse().join('/')})</span>
+                          </span>
+
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                              residuoQuota <= 0
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                : 'bg-amber-50 text-amber-800 border-amber-200'
+                            }`}
+                          >
+                            {residuoQuota <= 0 ? `Saldato (€${athlete.quotaVersata || 0})` : `Da saldare: €${residuoQuota}`}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Middle Row: PIN Management & Quick Contact */}
+                      <div className="bg-white rounded-xl p-2.5 border border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+                        {/* PIN management box */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+                            <KeyRound className="w-3.5 h-3.5 text-blue-900" />
+                            <span>PIN di Accesso:</span>
+                          </span>
+
+                          {!isEditingPin ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono font-bold bg-slate-100 text-slate-900 px-2 py-0.5 rounded-md border border-slate-200 tracking-wider">
+                                {isPinRevealed ? currentPin : '••••'}
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRevealedAthletePins((prev) => ({
+                                    ...prev,
+                                    [athlete.id]: !prev[athlete.id],
+                                  }));
+                                }}
+                                className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                                title={isPinRevealed ? 'Nascondi PIN' : 'Mostra PIN in chiaro'}
+                              >
+                                {isPinRevealed ? <Eye className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(currentPin);
+                                  setAthletesModalCopiedPinId(athlete.id);
+                                  setAthletesModalSuccess(`PIN di ${athlete.nome} ${athlete.cognome} copiato negli appunti: ${currentPin}`);
+                                  setTimeout(() => setAthletesModalCopiedPinId(null), 2500);
+                                }}
+                                className="p-1 rounded text-slate-400 hover:text-blue-900 hover:bg-blue-50 cursor-pointer"
+                                title="Copia PIN"
+                              >
+                                {athletesModalCopiedPinId === athlete.id ? (
+                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                ) : (
+                                  <Copy className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAthletesModalEditingPinId(athlete.id);
+                                  setAthletesModalNewPin(currentPin);
+                                }}
+                                className="text-[11px] font-bold text-blue-900 hover:underline cursor-pointer ml-1"
+                              >
+                                Modifica PIN
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                placeholder="Nuovo PIN"
+                                value={athletesModalNewPin}
+                                onChange={(e) => setAthletesModalNewPin(e.target.value)}
+                                className="w-24 px-2 py-0.5 bg-slate-50 border border-blue-900 rounded font-mono text-xs text-slate-900 outline-none"
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSaveAthletePinFromModal(athlete)}
+                                className="bg-blue-900 hover:bg-blue-800 text-white px-2 py-0.5 rounded text-[11px] font-bold cursor-pointer"
+                              >
+                                Salva
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAthletesModalEditingPinId(null);
+                                  setAthletesModalNewPin('');
+                                }}
+                                className="text-slate-500 hover:text-slate-800 text-[11px] px-1 cursor-pointer"
+                              >
+                                Annulla
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Actions: Direct WhatsApp & Full Profile Button */}
+                        <div className="flex items-center gap-1.5 ml-auto">
+                          {athlete.telefono && (
+                            <a
+                              href={`https://wa.me/${athlete.telefono.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                                `Salve ${athlete.nomeGenitore || athlete.nome}, la contatto dalla segreteria dell'ASD Grumo Volley per l'atleta ${athlete.nome} ${athlete.cognome}.`
+                              )}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-[11px] transition"
+                              title="Scrivi su WhatsApp al recapito registrato"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>WhatsApp ({athlete.telefono})</span>
+                            </a>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowAthletesModal(false);
+                              onSelectAthleteForView(athlete.id);
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-900 hover:bg-blue-800 text-white font-bold text-[11px] transition shadow-2xs cursor-pointer active:scale-95"
+                            title="Apri scheda atleta completa e documenti"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Vedi Scheda</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+              {athletes.length === 0 && (
+                <div className="text-center py-8 text-slate-400 text-xs">
+                  Nessun atleta registrato nei registri societari.
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="mt-4 pt-3.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAthletesModal(false);
+                    onOpenAddModal();
+                  }}
+                  className="flex items-center gap-1.5 bg-blue-900 hover:bg-blue-800 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer active:scale-95"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>Nuovo Atleta / Iscrizione</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAthletesModal(false);
+                    onOpenBroadcastModal();
+                  }}
+                  className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  <MessageCircle className="w-4 h-4 text-emerald-700" />
+                  <span>Invia Avviso a Tutti</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAthletesModal(false);
+                  setAthletesModalSuccess('');
+                  setAthletesModalEditingPinId(null);
+                }}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer transition"
+              >
+                Chiudi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showMatchesModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl max-w-3xl w-full p-6 shadow-2xl border border-slate-200 my-8 max-h-[90vh] flex flex-col">
@@ -1467,7 +2202,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                     Gestione Gare & Risultati
                   </h3>
                   <p className="text-xs text-slate-500">
-                    ASD Grumo in Casa (BLU) o Fuori Casa (ROSSO) • Aggiornabile esclusivamente dallo staff
+                    ASD Grumo in Casa o Fuori Casa • Aggiornabile esclusivamente dallo staff
                   </p>
                 </div>
               </div>
@@ -1545,7 +2280,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                           }`}
                         />
                         <div>
-                          <div className="text-xs font-bold">IN CASA (BLU)</div>
+                          <div className="text-xs font-bold">IN CASA</div>
                           <div
                             className={`text-[10px] ${
                               newMatchIsHome ? 'text-blue-200' : 'text-slate-400'
@@ -1571,13 +2306,13 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                           }`}
                         />
                         <div>
-                          <div className="text-xs font-bold">FUORI CASA (ROSSO)</div>
+                          <div className="text-xs font-bold">FUORI CASA</div>
                           <div
                             className={`text-[10px] ${
                               !newMatchIsHome ? 'text-red-200' : 'text-slate-400'
                             }`}
                           >
-                            In trasferta da avversari
+                            Gara esterna
                           </div>
                         </div>
                       </button>
@@ -1770,7 +2505,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                                   : 'bg-red-600 text-white'
                               }`}
                             >
-                              {m.isHome ? 'IN CASA • BLU' : 'FUORI CASA • ROSSO'}
+                              {m.isHome ? 'IN CASA' : 'FUORI CASA'}
                             </span>
                             <span className="text-xs font-bold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
                               {m.categoria}
@@ -1938,6 +2673,298 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({
                 onClick={() => {
                   setShowMatchesModal(false);
                   setShowAddMatchForm(false);
+                }}
+                className="px-4 py-2 font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl transition cursor-pointer"
+              >
+                Chiudi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NOTICES & COMUNICAZIONI MODAL */}
+      {showNoticesModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-3xl w-full p-6 shadow-2xl border border-slate-200 my-8 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200">
+                  <Megaphone className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight">
+                    Bacheca Avvisi & Comunicazioni Ufficiali
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Pubblica o modifica news, variazioni di orario, convocazioni ed eventi visibili a tutti.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowNoticesModal(false);
+                  setShowAddNoticeForm(false);
+                  setEditingNoticeId(null);
+                }}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+              {noticeFormSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-bold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>{noticeFormSuccess}</span>
+                </div>
+              )}
+
+              {/* Action bar inside modal */}
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-bold text-slate-700">
+                  Avvisi pubblicati: <span className="text-amber-700 font-black">{notices.length}</span>
+                </div>
+                {!showAddNoticeForm && (
+                  <button
+                    onClick={() => {
+                      setEditingNoticeId(null);
+                      setNewNoticeTitolo('');
+                      setNewNoticeContenuto('');
+                      setNewNoticeInEvidenza(false);
+                      setShowAddNoticeForm(true);
+                    }}
+                    className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer active:scale-95"
+                  >
+                    <Bell className="w-3.5 h-3.5" />
+                    <span>+ Nuovo Avviso</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Form Nuovo / Modifica Avviso */}
+              {showAddNoticeForm && (
+                <form
+                  onSubmit={handleSaveNotice}
+                  className="bg-amber-50/40 border border-amber-200 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm"
+                >
+                  <div className="flex items-center justify-between border-b border-amber-200/60 pb-2">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                      <Megaphone className="w-4 h-4 text-amber-600" />
+                      <span>{editingNoticeId ? 'Modifica Avviso' : 'Crea Nuovo Avviso Ufficiale'}</span>
+                    </h4>
+                    <span className="text-[11px] text-slate-500">
+                      Visibile a tutti gli atleti e famiglie nella bacheca
+                    </span>
+                  </div>
+
+                  {noticeFormError && (
+                    <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-bold flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>{noticeFormError}</span>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Titolo Comunicazione:
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="es. Variazione Orario Allenamento Giovedì"
+                        value={newNoticeTitolo}
+                        onChange={(e) => setNewNoticeTitolo(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 outline-none focus:border-amber-600 font-bold"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Categoria:
+                        </label>
+                        <select
+                          value={newNoticeCategoria}
+                          onChange={(e) => setNewNoticeCategoria(e.target.value as Notice['categoria'])}
+                          className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-amber-600 cursor-pointer"
+                        >
+                          <option value="COMUNICAZIONE">Comunicazione Generale</option>
+                          <option value="IMPORTANTE">Importante / Urgente</option>
+                          <option value="ALLENAMENTI">Allenamenti & Palestra</option>
+                          <option value="GARE">Gare & Calendario</option>
+                          <option value="EVENTI">Eventi & Tornei</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Priorità:
+                        </label>
+                        <select
+                          value={newNoticePriorita}
+                          onChange={(e) => setNewNoticePriorita(e.target.value as 'NORMALE' | 'ALTA')}
+                          className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:border-amber-600 cursor-pointer"
+                        >
+                          <option value="NORMALE">Normale</option>
+                          <option value="ALTA">Alta (in evidenza colorata)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Firma / Autore:
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="es. Dirigenza ASD Grumo"
+                          value={newNoticeAutore}
+                          onChange={(e) => setNewNoticeAutore(e.target.value)}
+                          className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 outline-none focus:border-amber-600"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={newNoticeInEvidenza}
+                          onChange={(e) => setNewNoticeInEvidenza(e.target.checked)}
+                          className="w-4 h-4 rounded text-amber-600 border-slate-300 focus:ring-amber-500"
+                        />
+                        <span>Fissa in cima alla bacheca (In Evidenza)</span>
+                      </label>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Testo Completo dell'Avviso:
+                      </label>
+                      <textarea
+                        rows={3}
+                        required
+                        placeholder="Inserisci il testo dettagliato della comunicazione..."
+                        value={newNoticeContenuto}
+                        onChange={(e) => setNewNoticeContenuto(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 outline-none focus:border-amber-600"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-amber-200/60">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddNoticeForm(false);
+                        setEditingNoticeId(null);
+                      }}
+                      className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl cursor-pointer"
+                    >
+                      Annulla
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-xs cursor-pointer active:scale-95 flex items-center gap-1.5"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>{editingNoticeId ? 'Salva Modifiche' : 'Pubblica in Bacheca'}</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Lista Avvisi */}
+              <div className="space-y-3 pt-2">
+                {notices.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-300 p-6">
+                    <Megaphone className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                    <p className="text-xs font-bold text-slate-600">Nessun avviso in bacheca</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Clicca su "+ Nuovo Avviso" per pubblicare la prima comunicazione.
+                    </p>
+                  </div>
+                ) : (
+                  notices.map((n) => (
+                    <div
+                      key={n.id}
+                      className={`rounded-2xl border p-4 transition-all ${
+                        n.inEvidenza
+                          ? 'bg-amber-50/50 border-amber-300 shadow-2xs'
+                          : 'bg-white border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          {n.inEvidenza && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-500 text-white tracking-wider">
+                              <Pin className="w-3 h-3" /> In Evidenza
+                            </span>
+                          )}
+                          <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                            {n.categoria}
+                          </span>
+                          {n.priorita === 'ALTA' && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-red-100 text-red-700 border border-red-200">
+                              Priorità Alta
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleOpenEditNotice(n)}
+                            className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 transition cursor-pointer flex items-center gap-1"
+                          >
+                            <Edit2 className="w-3 h-3 text-amber-700" />
+                            <span>Modifica</span>
+                          </button>
+
+                          {onDeleteNotice && (
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Eliminare l'avviso "${n.titolo}"?`)) {
+                                  onDeleteNotice(n.id);
+                                }
+                              }}
+                              className="p-1 text-slate-400 hover:text-red-600 transition cursor-pointer rounded-lg hover:bg-red-50"
+                              title="Elimina avviso"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <h4 className="text-sm font-black text-slate-900 leading-snug">
+                        {n.titolo}
+                      </h4>
+                      <p className="text-xs text-slate-600 mt-1 whitespace-pre-line leading-relaxed">
+                        {n.contenuto}
+                      </p>
+
+                      <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between text-[11px] text-slate-400">
+                        <span className="font-semibold text-slate-500">{n.autore}</span>
+                        <span>{n.data} {n.orario ? `ore ${n.orario}` : ''}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+              <span>Le comunicazioni sono visibili in cima alla schermata principale per tutti.</span>
+              <button
+                onClick={() => {
+                  setShowNoticesModal(false);
+                  setShowAddNoticeForm(false);
+                  setEditingNoticeId(null);
                 }}
                 className="px-4 py-2 font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl transition cursor-pointer"
               >

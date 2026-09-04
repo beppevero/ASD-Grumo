@@ -7,8 +7,32 @@
 
 body {
   font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  overscroll-behavior-y: none;
 }
 
 .font-display {
   font-family: var(--font-display);
+}
+
+/* Evita lo zoom automatico sgradevole di Safari su iOS quando si tocca un input */
+@media screen and (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Hide scrollbar utility for smooth horizontal touch carousels */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Safe area padding for modern notch/pill smartphones */
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
 }

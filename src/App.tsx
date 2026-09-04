@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Athlete, StaffUser, Match } from './types';
+import { Athlete, StaffUser, Match, Notice } from './types';
 import {
   loadAthletesFromStorage,
   saveAthletesToStorage,
   resetStorageToInitial,
   getStoredMatches,
   saveMatches,
+  getStoredNotices,
+  saveNotices,
 } from './utils/storage';
 import { Header } from './components/Header';
 import { AccessSelector } from './components/AccessSelector';
@@ -18,6 +20,7 @@ import { WifiOff, Heart } from 'lucide-react';
 export default function App() {
   const [athletes, setAthletes] = useState<Athlete[]>(() => loadAthletesFromStorage());
   const [matches, setMatches] = useState<Match[]>(() => getStoredMatches());
+  const [notices, setNotices] = useState<Notice[]>(() => getStoredNotices());
   const [currentView, setCurrentView] = useState<'SELECTOR' | 'ATHLETE' | 'STAFF'>('SELECTOR');
   const [selectedAthleteId, setSelectedAthleteId] = useState<string | null>(null);
   const [currentStaffUser, setCurrentStaffUser] = useState<StaffUser | null>(null);
@@ -138,6 +141,28 @@ export default function App() {
     saveMatches(updated);
   };
 
+  const handleAddNotice = (newNoticeData: Omit<Notice, 'id'>) => {
+    const newNotice: Notice = {
+      ...newNoticeData,
+      id: `notice-${Date.now()}`,
+    };
+    const updated = [newNotice, ...notices];
+    setNotices(updated);
+    saveNotices(updated);
+  };
+
+  const handleUpdateNotice = (updatedNotice: Notice) => {
+    const updated = notices.map((n) => (n.id === updatedNotice.id ? updatedNotice : n));
+    setNotices(updated);
+    saveNotices(updated);
+  };
+
+  const handleDeleteNotice = (noticeId: string) => {
+    const updated = notices.filter((n) => n.id !== noticeId);
+    setNotices(updated);
+    saveNotices(updated);
+  };
+
   const selectedAthlete = athletes.find((a) => a.id === selectedAthleteId);
 
   return (
@@ -176,6 +201,7 @@ export default function App() {
           <AccessSelector
             athletes={athletes}
             matches={matches}
+            notices={notices}
             onSelectAthlete={(id) => {
               setSelectedAthleteId(id);
               setCurrentView('ATHLETE');
@@ -184,6 +210,7 @@ export default function App() {
               setCurrentStaffUser(user || null);
               setCurrentView('STAFF');
             }}
+            onUpdateAthlete={handleUpdateAthlete}
           />
         )}
 
@@ -205,6 +232,10 @@ export default function App() {
             onAddMatch={handleAddMatch}
             onUpdateMatch={handleUpdateMatch}
             onDeleteMatch={handleDeleteMatch}
+            notices={notices}
+            onAddNotice={handleAddNotice}
+            onUpdateNotice={handleUpdateNotice}
+            onDeleteNotice={handleDeleteNotice}
             currentStaffUser={currentStaffUser}
             onUpdateAthlete={handleUpdateAthlete}
             onDeleteAthlete={handleDeleteAthlete}
